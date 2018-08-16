@@ -15,6 +15,16 @@ constexpr auto realsense_ros_camera_version = REALSENSE_ROS_EMBEDDED_VERSION_STR
 
 PLUGINLIB_EXPORT_CLASS(realsense2_camera::RealSenseNodeFactory, nodelet::Nodelet)
 
+rs2::device _device_;
+
+inline void signalHandler(int signum)
+{
+    ROS_INFO_STREAM(strsignal(signum) << " Signal is received! Terminating RealSense Node... by urock");
+    _device_.hardware_reset();
+    ros::shutdown();
+    exit(signum);
+}
+
 RealSenseNodeFactory::RealSenseNodeFactory()
 {
     ROS_INFO("RealSense ROS v%s", REALSENSE_ROS_VERSION_STR);
@@ -63,6 +73,15 @@ void RealSenseNodeFactory::onInit()
                 break;
             }
         }
+        _device_ = _device;
+
+//        ROS_WARN("UROCK Init");
+//
+//        _device.hardware_reset();
+//        rs2::device_hub hub(_ctx);
+//        _device = hub.wait_for_device();
+//
+//        ROS_WARN("UROCK Init End");
 
         if (!found)
         {
@@ -80,6 +99,8 @@ void RealSenseNodeFactory::onInit()
                 exit(1);
             }
         });
+
+
 
         // TODO
         auto pid_str = _device.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
