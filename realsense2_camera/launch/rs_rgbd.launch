@@ -45,6 +45,7 @@ Processing enabled by this node:
 
   <arg name="serial_no"           default=""/>
   <arg name="json_file_path"      default=""/>
+  <arg name="post_process_flag"      default="false"/>
 
   <arg name="fisheye_width"       default="640"/>
   <arg name="fisheye_height"      default="480"/>
@@ -79,20 +80,20 @@ Processing enabled by this node:
   <arg name="enable_sync"         default="true"/>
   <arg name="align_depth"         default="true"/>
 
-  <arg name="spatial_filter"      default="true"/>
+  <arg name="spatial_filter"      default="$(arg post_process_flag)"/>
   <arg name="spatial_alpha"       default="0.5"/>
   <arg name="spatial_delta"       default="20"/>
   <arg name="spatial_iterations"  default="2"/>
 
-  <arg name="temporal_filter"      default="true"/>
+  <arg name="temporal_filter"      default="$(arg post_process_flag)"/>
   <arg name="temporal_alpha"       default="0.4"/>
   <arg name="temporal_delta"       default="20"/>
   <arg name="temporal_persistence" default="3"/>
 
-  <arg name="holes_filter"         default="true"/>
+  <arg name="holes_filter"         default="$(arg post_process_flag)"/>
   <arg name="holes_filling_mode"   default="1"/>
 
-  <arg name="decimation_filter"    default="true"/>
+  <arg name="decimation_filter"    default="$(arg post_process_flag)"/>
   <arg name="dec_downsample_scale" default="2"/>
 
   <!-- rgbd_launch specific arguments -->
@@ -167,7 +168,7 @@ Processing enabled by this node:
       <arg name="enable_imu"               value="$(arg enable_imu)"/>
 
 
-      <arg name="spatial_filter"           value="$(arg enable_imu)"/>
+      <arg name="spatial_filter"           value="$(arg spatial_filter)"/>
       <arg name="spatial_alpha"            value="$(arg spatial_alpha)"/>
       <arg name="spatial_delta"            value="$(arg spatial_delta)"/>
       <arg name="spatial_iterations"       value="$(arg spatial_iterations)"/>
