@@ -79,16 +79,24 @@ BaseRealSenseNode::BaseRealSenseNode(ros::NodeHandle& nodeHandle,
     _encoding[ACCEL] = sensor_msgs::image_encodings::TYPE_8UC1; // ROS message type
     _unit_step_size[ACCEL] = sizeof(uint8_t); // sensor_msgs::ImagePtr row step size
     _stream_name[ACCEL] = "accel";
+
+    // Inititalize filters
+    _decimation_filter = std::make_shared<rs2::decimation_filter>();
+    _temporal_filter = std::make_shared<rs2::temporal_filter>();
+    _spatial_filter = std::make_shared<rs2::spatial_filter>();
+    _hole_filling_filter = std::make_shared<rs2::hole_filling_filter>();
+    _depth_to_disparity = std::make_shared<rs2::disparity_transform>(true);
+    _disparity_to_depth = std::make_shared<rs2::disparity_transform>(false);
 }
 
 void BaseRealSenseNode::publishTopics()
 {
     getParameters();
+    setupPostProcessing();
     setupDevice();
     setupPublishers();
     setupStreams();
     publishStaticTransforms();
-    ROS_INFO_STREAM("RealSense Node Is Up!");
 }
 
 void BaseRealSenseNode::registerDynamicReconfigCb()
@@ -164,6 +172,57 @@ void BaseRealSenseNode::getParameters()
     _pnh.param("aligned_depth_to_infra1_frame_id",  _depth_aligned_frame_id[INFRA1],  DEFAULT_ALIGNED_DEPTH_TO_INFRA1_FRAME_ID);
     _pnh.param("aligned_depth_to_infra2_frame_id",  _depth_aligned_frame_id[INFRA2],  DEFAULT_ALIGNED_DEPTH_TO_INFRA2_FRAME_ID);
     _pnh.param("aligned_depth_to_fisheye_frame_id", _depth_aligned_frame_id[FISHEYE], DEFAULT_ALIGNED_DEPTH_TO_FISHEYE_FRAME_ID);
+
+    _pnh.param("aligned_depth_to_fisheye_frame_id", _depth_aligned_frame_id[FISHEYE], DEFAULT_ALIGNED_DEPTH_TO_FISHEYE_FRAME_ID);
+
+    // TODO: verify these values are correct.
+    _pnh.param("active_spatial_filter", _active_spatial_filter, DEFAULT_ACTIVE_SPATIAL); 
+    _pnh.param("spatial_delta", _spatial_delta, DEFAULT_SPATIAL_DELTA);
+    _pnh.param("spatial_alpha", _spatial_alpha, DEFAULT_SPATIAL_ALPHA); 
+    _pnh.param("spatial_iterations", _spatial_iterations, DEFAULT_SPATIAL_ITERATIONS);
+
+    _pnh.param("active_temporal_filter", _active_temporal_filter, DEFAULT_ACTIVE_TEMPORAL);
+    _pnh.param("temporal_alpha", _temporal_alpha, DEFAULT_TEMPORAL_ALPHA);
+    _pnh.param("temporal_delta", _temporal_delta, DEFAULT_TEMPORAL_DELTA);
+    _pnh.param("temporal_persistence", _temporal_persistence, DEFAULT_TEMPORAL_PERSISTENCE);
+
+    _pnh.param("active_holes_filter", _active_holes_filter, DEFAULT_ACTIVE_HOLES);
+    _pnh.param("holes_filling_mode", _holes_filling_mode, DEFAULT_HOLES_FILLING_MODE);
+
+    _pnh.param("active_holes_filter", _active_holes_filter, DEFAULT_ACTIVE_HOLES);
+    _pnh.param("holes_filling_mode", _holes_filling_mode, DEFAULT_HOLES_FILLING_MODE);
+
+    _pnh.param("active_decimation_filter", _active_decimation_filter, DEFAULT_ACTIVE_DECIMATION);
+    _pnh.param("dec_downsample_scale", _decimation_downsample_scale, DEFAULT_DEC_DOWNSAMPLE_SCALE);
+}
+
+void BaseRealSenseNode::setupPostProcessing() {
+  // Set spatial filter options
+  if (_active_spatial_filter) 
+  {
+    _spatial_filter->set_option(RS2_OPTION_FILTER_SMOOTH_ALPHA, _spatial_alpha);
+    _spatial_filter->set_option(RS2_OPTION_FILTER_SMOOTH_DELTA, (uint8_t)_spatial_delta);
+    _spatial_filter->set_option(RS2_OPTION_FILTER_MAGNITUDE, (float)_spatial_iterations);
+    //_spatial_filter->set_option(RS2_OPTION_HOLES_FILL, _holes_filling_mode); // Disabled
+  }
+  // Temporal filter options
+  if (_active_temporal_filter) 
+  {
+    _temporal_filter->set_option(RS2_OPTION_FILTER_SMOOTH_ALPHA, _temporal_alpha);
+    _temporal_filter->set_option(RS2_OPTION_FILTER_SMOOTH_DELTA, (uint8_t)_temporal_delta);
+    _temporal_filter->set_option(RS2_OPTION_HOLES_FILL, (uint8_t)_temporal_persistence);
+  }
+  // Holes filter options
+  if (_active_holes_filter)
+  {
+    _hole_filling_filter->set_option(RS2_OPTION_HOLES_FILL, _holes_filling_mode); 
+  }
+  
+  // Decimation filter options
+  if (_active_decimation_filter)
+  {
+    _decimation_filter->set_option(RS2_OPTION_FILTER_MAGNITUDE, (float) _decimation_downsample_scale);
+  }
 }
 
 void BaseRealSenseNode::setupDevice()
@@ -429,6 +488,29 @@ void BaseRealSenseNode::alignFrame(const rs2_intrinsics& from_intrin,
     }
 }
 
+rs2::frame BaseRealSenseNode::postProcessFrame(rs2::frame frame) 
+{
+    // auto f = decimation_filter->process(frame); // decimation filter not added yet
+    auto f = _depth_to_disparity->process(frame);
+    if (_active_spatial_filter) {
+      f = _spatial_filter->process(f);
+    }
+    if (_active_temporal_filter) {
+      f = _temporal_filter->process(f);
+    }
+    if (_active_holes_filter) {
+      f = _hole_filling_filter->process(f);
+    }
+    //if (_active_decimation_filter) { TODO: implement decimation filter
+    //  this may require resizing the image back to the desired size after the decimation.
+    //  Look at example code in librealsense: unit-tests-post-processing.cpp
+    //}
+    // auto video_profile = frame.get_profile().as<rs2::video_stream_profile>();
+    // updateStreamCalibData(video_profile);
+    frame = _disparity_to_depth->process(f);
+    return frame;
+}
+
 void BaseRealSenseNode::updateIsFrameArrived(std::map<stream_index_pair, bool>& is_frame_arrived,
                                              rs2_stream stream_type, int stream_index)
 {
@@ -559,7 +641,6 @@ void BaseRealSenseNode::setupStreams()
                 std::vector<rs2::frame> frames;
                 if (frame.is<rs2::frameset>())
                 {
-                    ROS_DEBUG("Frameset arrived.");
                     bool is_depth_arrived = false;
                     rs2::frame depth_frame;
                     auto frameset = frame.as<rs2::frameset>();
@@ -568,6 +649,11 @@ void BaseRealSenseNode::setupStreams()
                         auto f = (*it);
                         auto stream_type = f.get_profile().stream_type();
                         auto stream_index = f.get_profile().stream_index();
+												// depth filter post-processing 
+                        if (stream_type == RS2_STREAM_DEPTH)
+												{
+                          f = postProcessFrame(f);
+												}
                         updateIsFrameArrived(is_frame_arrived, stream_type, stream_index);
 
                         ROS_DEBUG("Frameset contain (%s, %d) frame. frame_number: %llu ; frame_TS: %f ; ros_TS(NSec): %lu",
@@ -602,6 +688,12 @@ void BaseRealSenseNode::setupStreams()
                 {
                     auto stream_type = frame.get_profile().stream_type();
                     auto stream_index = frame.get_profile().stream_index();
+                    if (stream_type == RS2_STREAM_DEPTH)
+                    {
+                      frame = postProcessFrame(frame);
+                    }
+                    stream_type = frame.get_profile().stream_type();
+                    stream_index = frame.get_profile().stream_index();
                     updateIsFrameArrived(is_frame_arrived, stream_type, stream_index);
                     ROS_DEBUG("Single video frame arrived (%s, %d). frame_number: %llu ; frame_TS: %f ; ros_TS(NSec): %lu",
                               rs2_stream_to_string(stream_type), stream_index, frame.get_frame_number(), frame.get_timestamp(), t.toNSec());
