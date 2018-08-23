@@ -490,8 +490,50 @@ void BaseRealSenseNode::alignFrame(const rs2_intrinsics& from_intrin,
 
 rs2::frame BaseRealSenseNode::postProcessFrame(rs2::frame frame) 
 {
-    // auto f = decimation_filter->process(frame); // decimation filter not added yet
-    auto f = _depth_to_disparity->process(frame);
+    auto f=frame;
+    if (_active_decimation_filter)
+    {
+        auto src1 = frame.as<rs2::video_frame>();
+        f = _decimation_filter->process(frame);
+        
+        auto src2 = f.as<rs2::video_frame>();
+//        std::cout << "height & width after dec: " << src2.get_width() << "; " << src2.get_height() << std::endl;
+
+        cv::Mat DIm(src2.get_height(), src2.get_width(), CV_16UC1);
+        cv::Mat DImRes(src1.get_height(), src1.get_width(), CV_16UC1);
+
+        for (int ii = 0; ii < src2.get_height(); ii++)
+        {
+            for (int jj = 0; jj < src2.get_width(); jj++)
+            {
+                DIm.at<uint16_t>(ii, jj) = *((uint16_t *) src2.get_data() + ii * src2.get_width() + jj);
+            }
+        }
+
+        cv::resize(DIm, DImRes, cv::Size(src1.get_width(), src1.get_height()));
+
+        f = frame;
+        auto src3 = f.as<rs2::video_frame>();
+        for (int ii = 0; ii < src3.get_height(); ii++)
+        {
+            for (int jj = 0; jj < src3.get_width(); jj++)
+            {
+                const_cast<uint16_t *>((uint16_t *) src3.get_data())[ii * src3.get_width() + jj] = DImRes.at<uint16_t>(
+                        ii, jj);
+            }
+        }
+//        std::cout << "height & width final: " << src3.get_width() << "; " << src3.get_height() << std::endl;
+    }
+
+
+////----------------------------------------------------------------------------------------//
+
+
+
+    //auto f = _depth_to_disparity->process(frame);
+    f = _depth_to_disparity->process(f);
+
+
     if (_active_spatial_filter) {
       f = _spatial_filter->process(f);
     }
@@ -501,6 +543,7 @@ rs2::frame BaseRealSenseNode::postProcessFrame(rs2::frame frame)
     if (_active_holes_filter) {
       f = _hole_filling_filter->process(f);
     }
+
     //if (_active_decimation_filter) { TODO: implement decimation filter
     //  this may require resizing the image back to the desired size after the decimation.
     //  Look at example code in librealsense: unit-tests-post-processing.cpp

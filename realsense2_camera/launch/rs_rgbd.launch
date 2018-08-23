@@ -57,11 +57,11 @@ Processing enabled by this node:
 
   <arg name="infra1_width"        default="640"/>
   <arg name="infra1_height"       default="480"/>
-  <arg name="enable_infra1"       default="true"/>
+  <arg name="enable_infra1"       default="false"/>
 
   <arg name="infra2_width"        default="640"/>
   <arg name="infra2_height"       default="480"/>
-  <arg name="enable_infra2"       default="true"/>
+  <arg name="enable_infra2"       default="false"/>
 
   <arg name="color_width"         default="640"/>
   <arg name="color_height"        default="480"/>
@@ -94,7 +94,8 @@ Processing enabled by this node:
   <arg name="holes_filling_mode"   default="1"/>
 
   <arg name="decimation_filter"    default="$(arg post_process_flag)"/>
-  <arg name="dec_downsample_scale" default="2"/>
+  <!-- <arg name="decimation_filter"    default="true"/> -->
+  <arg name="dec_downsample_scale" default="8"/>
 
   <!-- rgbd_launch specific arguments -->
 
