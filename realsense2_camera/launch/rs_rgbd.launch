@@ -45,7 +45,7 @@ Processing enabled by this node:
 
   <arg name="serial_no"           default=""/>
   <arg name="json_file_path"      default=""/>
-  <arg name="post_process_flag"      default="false"/>
+  <arg name="post_process_flag"   default="true"/>
 
   <arg name="fisheye_width"       default="640"/>
   <arg name="fisheye_height"      default="480"/>
@@ -68,10 +68,10 @@ Processing enabled by this node:
   <arg name="enable_color"        default="true"/>
 
   <arg name="fisheye_fps"         default="30"/>
-  <arg name="depth_fps"           default="30"/>
+  <arg name="depth_fps"           default="15"/>
   <arg name="infra1_fps"          default="30"/>
   <arg name="infra2_fps"          default="30"/>
-  <arg name="color_fps"           default="30"/>
+  <arg name="color_fps"           default="15"/>
   <arg name="gyro_fps"            default="1000"/>
   <arg name="accel_fps"           default="1000"/>
   <arg name="enable_imu"          default="true"/>
@@ -95,7 +95,7 @@ Processing enabled by this node:
 
   <arg name="decimation_filter"    default="$(arg post_process_flag)"/>
   <!-- <arg name="decimation_filter"    default="true"/> -->
-  <arg name="dec_downsample_scale" default="8"/>
+  <arg name="dec_downsample_scale" default="2"/>
 
   <!-- rgbd_launch specific arguments -->
 
