@@ -12,6 +12,27 @@ T265RealsenseNode::T265RealsenseNode(ros::NodeHandle& nodeHandle,
                                      {
                                          _monitor_options = {RS2_OPTION_ASIC_TEMPERATURE, RS2_OPTION_MOTION_MODULE_TEMPERATURE};
                                          initializeOdometryInput();
+
+                                         std::vector<rs2::sensor> sensors = dev.query_sensors();
+                                         for (rs2::sensor element : sensors) {
+                                             std::string module_name = element.get_info(RS2_CAMERA_INFO_NAME);
+
+                                             ROS_WARN("urock %s",module_name.c_str());
+
+                                             if (module_name == "Tracking Module") {
+                                                 float relocalization_value = element.get_option(RS2_OPTION_ENABLE_RELOCALIZATION);
+                                                 float pose_jump_value = element.get_option(RS2_OPTION_ENABLE_POSE_JUMPING);
+
+                                                 ROS_WARN("RS2_OPTION_ENABLE_RELOCALIZATION = %f", relocalization_value);
+                                                 ROS_WARN("RS2_OPTION_ENABLE_POSE_JUMPING = %f", pose_jump_value);
+
+                                                 element.set_option(rs2_option::RS2_OPTION_ENABLE_RELOCALIZATION, 0.f);
+                                                 element.set_option(rs2_option::RS2_OPTION_ENABLE_POSE_JUMPING, 0.f);
+
+                                                 ROS_WARN("RS2_OPTION_ENABLE_RELOCALIZATION = %f", element.get_option(RS2_OPTION_ENABLE_RELOCALIZATION));
+                                                 ROS_WARN("RS2_OPTION_ENABLE_POSE_JUMPING = %f", element.get_option(RS2_OPTION_ENABLE_POSE_JUMPING));
+                                             }
+                                         }
                                      }
 
 void T265RealsenseNode::initializeOdometryInput()
